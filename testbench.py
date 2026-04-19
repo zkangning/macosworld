@@ -3,12 +3,14 @@ import json
 import shutil
 import socket
 import argparse
+from pathlib import Path
 
 from utils.log import print_message
 from utils.languages import parse_language_list
 from utils.run_task import run_task
 from utils.timeout import TimeoutException
 from constants import env_init_command, eval_init_command, language_lookup_table
+from agent.task_skill_resolver import resolve_task_skill_names
 
 
 # Parse args
@@ -29,7 +31,7 @@ parser.add_argument('--task_max_attempts', type=int, default=2)
 parser.add_argument('--task_step_timeout', type=int, default=120)
 
 parser.add_argument('--gui_agent_name', type=str, required=True)
-parser.add_argument('--max-steps', type=int, default=15)
+parser.add_argument('--max-steps', type=int, default=20)
 parser.add_argument('--base_save_dir', type=str, default='./results')
 parser.add_argument('--paths_to_eval_tasks', nargs='+', required=True)
 parser.add_argument('--languages', nargs='+', required=True)
@@ -37,6 +39,28 @@ parser.add_argument('--languages', nargs='+', required=True)
 parser.add_argument('--port', type=int, default=None)
 
 arguments = parser.parse_args()
+
+
+def _skills_enabled() -> bool:
+    value = os.environ.get("MACOSWORLD_ENABLE_SKILLS", "").strip().lower()
+    return value in {"1", "true", "yes", "on"} or "skill" in arguments.gui_agent_name.lower()
+
+
+def _task_skill_top_k() -> int:
+    raw = os.environ.get("MACOSWORLD_TASK_SKILL_TOP_K", "6").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return 6
+    return value if value > 0 else 6
+
+
+def _task_fallback_skill_names(task_dict: dict):
+    for key in ("skills", "task_skills"):
+        value = task_dict.get(key)
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+    return []
 
 
 if arguments.instance_id is None and arguments.vmx_path is None:
@@ -53,7 +77,19 @@ if arguments.instance_id is None and arguments.vmx_path is None:
 tasks = []
 for path in arguments.paths_to_eval_tasks:
     category_name = os.path.basename(os.path.normpath(path))
-    tasks += [(category_name, os.path.join(path, file)) for file in os.listdir(path) if file.lower().endswith('json')]
+    for file in os.listdir(path):
+        if not file.lower().endswith('json'):
+            continue
+        json_path = os.path.join(path, file)
+        source_domain = Path(json_path).resolve().parent.name
+        with open(json_path, 'r') as f:
+            task_dict = json.load(f)
+        tasks.append({
+            "category_name": category_name,
+            "source_domain": source_domain,
+            "json_path": json_path,
+            "task_dict": task_dict,
+        })
 
 language_combinations = parse_language_list(arguments.languages)
 
@@ -67,15 +103,39 @@ for task_language, env_language in language_combinations:
         task_language = language_lookup_table[task_language]
     if env_language in language_lookup_table:
         env_language = language_lookup_table[env_language]
-    
 
-    for task_index, (task_category, json_path) in enumerate(tasks):
+    ordered_tasks = sorted(
+        tasks,
+        key=lambda task_entry: (
+            task_entry["task_dict"]["snapshot"].get(env_language, ""),
+            task_entry["category_name"],
+            task_entry["task_dict"]["id"],
+        )
+    )
 
-        # Load task json file
-        with open(json_path, 'r') as f:
-            task_dict = json.load(f)
+    for task_index, task_entry in enumerate(ordered_tasks):
+        task_category = task_entry["category_name"]
+        task_source_domain = task_entry.get("source_domain")
+        task_dict = task_entry["task_dict"]
         task_uuid = task_dict['id']
-        task_id = f'({task_index + 1}/{len(tasks)})'
+        task_id = f'({task_index + 1}/{len(ordered_tasks)})'
+
+        if _skills_enabled():
+            task_skills = resolve_task_skill_names(
+                domain=task_source_domain,
+                task_id=task_uuid,
+                fallback_skill_names=_task_fallback_skill_names(task_dict),
+                skills_library_dir=os.environ.get("MACOSWORLD_SKILLS_LIBRARY_DIR", "skills_library"),
+                mapping_root=os.environ.get("MACOSWORLD_TASK_SKILL_MAPPING_ROOT"),
+                top_k=_task_skill_top_k(),
+            )
+            task_dict = dict(task_dict)
+            task_dict["__resolved_task_skills__"] = task_skills
+            if task_skills:
+                print_message(
+                    f"Resolved task skills: {task_skills}",
+                    title = f'Task {task_id}, task language {task_language}, env language {env_language}'
+                )
 
         # Check if there is strict env requirement
         # if arguments.instance_id is None and arguments.vmx_path is not None:
@@ -152,8 +212,12 @@ for task_language, env_language in language_combinations:
                 break
             except TimeoutException as e:
                 print_message(e, title = f'Task {task_id} Error')
+                with open(os.path.join(save_dir, 'error.txt'), 'a', encoding='utf-8') as error_file:
+                    error_file.write(f'[Attempt {task_attempt}] TimeoutException: {e}\n')
             except Exception as e:
                 print_message(e, title = f'Task {task_id} Error')
+                with open(os.path.join(save_dir, 'error.txt'), 'a', encoding='utf-8') as error_file:
+                    error_file.write(f'[Attempt {task_attempt}] Exception: {type(e).__name__}: {e}\n')
 
         if not task_complete_flag:
             print_message(f'Task failed after max attempts: {task_uuid}', title = f'Task {task_id} Error')

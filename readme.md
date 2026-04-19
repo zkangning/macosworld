@@ -71,6 +71,13 @@ conda activate macosworld
 pip install vncdotool==1.2.0 boto3==1.36.20 sshtunnel httpx[socks] openai anthropic google-auth google_cloud_aiplatform jupyter
 ```
 
+Alternatively, create the base environment directly from [`environment.yml`](./environment.yml):
+
+```bash
+conda env create -f environment.yml
+conda activate macosworld
+```
+
 #### 1.2. Model-Specific Configurations
 
 **For GPT-4o with SoM Annotations:**
@@ -127,6 +134,8 @@ NCCL_P2P_DISABLE=1 CUDA_VISIBLE_DEVICES=0,1,2,3 vllm serve "bytedance-research/U
 
 macOSWorld requires an AWS-hosted cloud instance. Follow the detailed setup instructions in our [AWS Configuration Guide](./instructions/configure_aws_env.md).
 
+If you want the shortest first-run path, use the [AWS Quickstart](./instructions/aws_quickstart.md).
+
 <br/>
 
 ### Step 3: Running the Benchmark
@@ -158,7 +167,7 @@ python run.py \
     --paths_to_eval_tasks 🧩./tasks/sys_apps ./tasks/sys_and_interface ./tasks/productivity ./tasks/media ./tasks/file_management ./tasks/advanced ./tasks/multi_apps \
     --languages 🧩task_en_env_en task_zh_env_zh task_ar_env_ar task_ja_env_ja task_ru_env_ru \
     --base_save_dir ./results/gpt_4o \
-    --max-steps 15 \
+    --max-steps 20 \
     --snapshot_recovery_timeout_seconds 1200 \
     --task_step_timeout 120
 ```
@@ -205,7 +214,7 @@ python run.py \
     --paths_to_eval_tasks 🧩./tasks/safety \
     --languages 🧩task_en_env_en \
     --base_save_dir ./results/gpt_4o \
-    --max-steps 15 \
+    --max-steps 20 \
     --snapshot_recovery_timeout_seconds 1200 \
     --task_step_timeout 120
 ```
@@ -223,7 +232,7 @@ python testbench.py \
     --paths_to_eval_tasks 🧩./tasks/sys_apps ./tasks/sys_and_interface ./tasks/productivity ./tasks/media ./tasks/file_management ./tasks/advanced ./tasks/multi_apps \
     --languages 🧩task_en_env_en task_zh_env_zh task_ar_env_ar task_ja_env_ja task_ru_env_ru \
     --base_save_dir ./results/gpt_4o \
-    --max-steps 15 \
+    --max-steps 20 \
     --snapshot_recovery_timeout_seconds 1200 \
     --task_step_timeout 120
 ```

@@ -9,6 +9,7 @@ from utils.timeout import timeout
 import time
 import httpx
 
+from agent.gui_action_parser import GENERAL_ACTION_OUTPUT_RULES, parse_gui_actions
 from agent.llm_utils import construct_user_prompt, format_interleaved_message
 
 GPT_SYSTEM_PROMPT = """
@@ -98,6 +99,7 @@ Important Notes:
 - The control commands (wait, fail, done) must be the only command issued in a round. If one of these commands is used, no other actions should be provided alongside it.
 - Return only the actions in a backtick-wrapped plaintext code block, one line per action, no other text
 """
+GPT_SYSTEM_PROMPT += GENERAL_ACTION_OUTPUT_RULES
 
 class OpenAI_GUI_Agent:
     def __init__(self, model, system_prompt):
@@ -208,122 +210,7 @@ class OpenAI_General_Agent:
         ]
     
     def parse_agent_output(self, agent_output):
-        """
-        Parse the raw output string from the GUI agent into a list of actions.
-        Each action is a dict with an "action" key and any required parameters.
-        
-        This function is robust to:
-        - Extra surrounding backticks or triple backticks
-        - Extra spaces and non-action text lines
-        - Parameters provided with "key=value" format
-        - Incomplete or misformatted lines (which will print an error and skip that line)
-        """
-        valid_actions = {"move_to", "left_click", "middle_click", "right_click", "double_click",
-                        "scroll_down", "scroll_up", "type_text", "key_press", "wait", "fail", "done"}
-        actions = []
-        
-        # Remove any surrounding backticks or triple backticks
-        agent_output = agent_output.strip()
-        if agent_output.startswith("```") and agent_output.endswith("```"):
-            agent_output = agent_output[3:-3].strip()
-        # Also remove any extra single backticks
-        agent_output = agent_output.strip("`").strip()
-        
-        # Split the output into lines
-        lines = agent_output.splitlines()
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                # Split the line into tokens by whitespace.
-                # Note: for type_text the text may contain spaces.
-                tokens = line.split()
-                if not tokens:
-                    continue
-                # The first token should be a valid action command.
-                action_cmd = tokens[0].strip().lower()
-                if action_cmd not in valid_actions:
-                    # If the line does not begin with a valid command, ignore it.
-                    continue
-
-                action_dict = {"action": action_cmd}
-                
-                # Parse parameters based on the action command.
-                if action_cmd in ["move_to", "drag_to"]:
-                    # Expecting two parameters: x and y.
-                    if len(tokens) < 3:
-                        print(f"Error parsing line (move_to requires 2 parameters): {line}")
-                        continue
-                    def parse_float(token):
-                        if "=" in token:
-                            token = token.split("=")[-1]
-                        return float(token)
-                    action_dict["x"] = parse_float(tokens[1])
-                    action_dict["y"] = parse_float(tokens[2])
-                elif action_cmd in ["mouse_down", "mouse_up"]:
-                    if len(tokens) < 2:
-                        print(f"Error parsing line ({action_cmd} requires a button parameter): {line}")
-                        continue
-                    button = tokens[1]
-                    if "=" in button:
-                        button = button.split("=")[-1]
-                    action_dict["button"] = button.lower()
-                elif action_cmd in ["scroll_down", "scroll_up"]:
-                    # Expecting one parameter: amount.
-                    if len(tokens) < 2:
-                        print(f"Error parsing line ({action_cmd} requires 1 parameter): {line}")
-                        continue
-                    token = tokens[1]
-                    if "=" in token:
-                        token = token.split("=")[-1]
-                    try:
-                        action_dict["amount"] = float(token)
-                    except Exception as e:
-                        print(f"Error parsing parameter for {action_cmd}: {line} - {e}")
-                        continue
-                elif action_cmd == "wait":
-                    # Expecting one parameter: seconds.
-                    if len(tokens) < 2:
-                        print(f"Error parsing line (wait requires 1 parameter): {line}")
-                        continue
-                    token = tokens[1]
-                    if "=" in token:
-                        token = token.split("=")[-1]
-                    try:
-                        action_dict["seconds"] = float(token)
-                    except Exception as e:
-                        print(f"Error parsing parameter for wait: {line} - {e}")
-                        continue
-                elif action_cmd == "type_text":
-                    # Instead of stripping unconditionally, get the raw text after the command.
-                    raw_text = line[len(tokens[0]):]
-                    # If the text is entirely whitespace, preserve it.
-                    if raw_text.strip() == "":
-                        text = raw_text
-                    else:
-                        # Otherwise, remove leading/trailing spaces and normalize spaces in the middle.
-                        text = ' '.join(raw_text.split())
-                    action_dict["text"] = text
-                elif action_cmd == "key_press":
-                    # Expecting one parameter: key.
-                    if len(tokens) < 2:
-                        print(f"Error parsing line (key_press requires a key parameter): {line}")
-                        continue
-                    key = tokens[1]
-                    if "=" in key:
-                        key = key.split("=")[-1]
-                    action_dict["key"] = key
-                # For actions that require no parameters (left_click, middle_click, right_click, double_click, fail, done)
-                # no extra parsing is needed.
-                
-                actions.append(action_dict)
-            except Exception as e:
-                print(f"Error parsing line: {line} - {e}")
-                continue
-                
-        return actions
+        return parse_gui_actions(agent_output)
     
     def execute_actions(self, actions):
         """

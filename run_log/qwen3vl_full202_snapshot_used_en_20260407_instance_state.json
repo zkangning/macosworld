@@ -1,0 +1,17 @@
+{
+  "i-0e952b1268a19b6a7": {
+    "active_instance_id": "i-0e952b1268a19b6a7",
+    "availability_zone": "ap-southeast-1a",
+    "host_id": "h-04e49661c1901b945",
+    "iam_instance_profile_arn": null,
+    "instance_name": "qwen3vl-full202-used-en-20260407",
+    "instance_type": "mac2.metal",
+    "key_name": "macosworld-gemini-smoke-20260403-key",
+    "security_group_ids": [
+      "sg-0324bde9759ab4283"
+    ],
+    "snapshot_name": "snapshot_used_en",
+    "ssh_host": "ec2-18-141-235-216.ap-southeast-1.compute.amazonaws.com",
+    "subnet_id": "subnet-0523d71491e819dbb"
+  }
+}

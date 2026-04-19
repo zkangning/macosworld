@@ -1,0 +1,288 @@
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:09:48] worker=usedApps_en waiting for host h-0be9bd06f7d08b74c'
+[2026-04-17_21:09:48] worker=usedApps_en waiting for host h-0be9bd06f7d08b74c
++ wait_host_available h-0be9bd06f7d08b74c
++ local host_id=h-0be9bd06f7d08b74c
++ true
++ local state
+++ aws ec2 describe-hosts --host-ids h-0be9bd06f7d08b74c --query 'Hosts[0].State' --output text
++ state=available
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:09:49] host h-0be9bd06f7d08b74c state=available'
+[2026-04-17_21:09:49] host h-0be9bd06f7d08b74c state=available
++ '[' available = available ']'
++ return 0
++ local instance_id
+++ aws ec2 run-instances --image-id ami-07f4fd69378358c18 --instance-type mac2.metal --key-name macosworld-gemini-smoke-20260403-key --security-group-ids sg-0324bde9759ab4283 --subnet-id subnet-0523d71491e819dbb --placement Tenancy=host,HostId=h-0be9bd06f7d08b74c,AvailabilityZone=ap-southeast-1a --count 1 --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=gemini3flash-baseline5-usedApps-en-20260417}]' --query 'Instances[0].InstanceId' --output text
++ instance_id=i-0063c48c9b80e5abd
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:09:51] worker=usedApps_en launched instance=i-0063c48c9b80e5abd'
+[2026-04-17_21:09:51] worker=usedApps_en launched instance=i-0063c48c9b80e5abd
++ wait_instance_running i-0063c48c9b80e5abd
++ local instance_id=i-0063c48c9b80e5abd
++ true
++ local state
+++ aws ec2 describe-instances --instance-ids i-0063c48c9b80e5abd --query 'Reservations[0].Instances[0].State.Name' --output text
++ state=pending
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:09:53] instance i-0063c48c9b80e5abd state=pending'
+[2026-04-17_21:09:53] instance i-0063c48c9b80e5abd state=pending
++ '[' pending = running ']'
++ sleep 10
++ true
++ local state
+++ aws ec2 describe-instances --instance-ids i-0063c48c9b80e5abd --query 'Reservations[0].Instances[0].State.Name' --output text
++ state=running
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:10:05] instance i-0063c48c9b80e5abd state=running'
+[2026-04-17_21:10:05] instance i-0063c48c9b80e5abd state=running
++ '[' running = running ']'
++ return 0
++ local dns_name
+++ aws ec2 describe-instances --instance-ids i-0063c48c9b80e5abd --query 'Reservations[0].Instances[0].PublicDnsName' --output text
++ dns_name=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:10:06] worker=usedApps_en dns=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:10:06] worker=usedApps_en dns=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ wait_ssh_ready ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ local host=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:10:15] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:10:15] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:10:38] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:10:38] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:11:01] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:11:01] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:11:24] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:11:24] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:11:47] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:11:47] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:12:10] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:12:10] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:12:33] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:12:33] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:12:56] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:12:56] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:13:19] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:13:19] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:13:43] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:13:43] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:14:06] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:14:06] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:14:29] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:14:29] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:14:53] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:14:53] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:15:16] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:15:16] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:15:39] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:15:39] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:16:02] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:16:02] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:16:25] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:16:25] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:16:48] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:16:48] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:17:11] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:17:11] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:17:34] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:17:34] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:17:57] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:17:57] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:18:20] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:18:20] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:18:44] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:18:44] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:19:07] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:19:07] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:19:30] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:19:30] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:19:53] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:19:53] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:20:16] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:20:16] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:20:39] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:20:39] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:21:02] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:21:02] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:21:25] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:21:25] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:21:48] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:21:48] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:22:11] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:22:11] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:22:35] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:22:35] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:22:58] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:22:58] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:23:21] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com'
+[2026-04-17_21:23:21] waiting for SSH on ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ sleep 15
++ ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=8 -i /Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem ec2-user@ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com exit 0
+++ ts
+++ date +%F_%T
++ echo '[2026-04-17_21:23:37] worker=usedApps_en ssh_ready'
+[2026-04-17_21:23:37] worker=usedApps_en ssh_ready
++ cat
++ export MACOSWORLD_INSTANCE_ID=i-0063c48c9b80e5abd
++ MACOSWORLD_INSTANCE_ID=i-0063c48c9b80e5abd
++ export MACOSWORLD_SSH_HOST=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ MACOSWORLD_SSH_HOST=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ export MACOSWORLD_SSH_PKEY=/Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem
++ MACOSWORLD_SSH_PKEY=/Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem
++ export MACOSWORLD_GUI_AGENT_NAME=gemini-3-flash
++ MACOSWORLD_GUI_AGENT_NAME=gemini-3-flash
++ export MACOSWORLD_PATHS_TO_EVAL_TASKS=./tasks/baseline5_snapshot_usedApps_en
++ MACOSWORLD_PATHS_TO_EVAL_TASKS=./tasks/baseline5_snapshot_usedApps_en
++ export MACOSWORLD_BASE_SAVE_DIR=./results/gemini3flash_baseline5_snapshot_usedApps_en_20260417
++ MACOSWORLD_BASE_SAVE_DIR=./results/gemini3flash_baseline5_snapshot_usedApps_en_20260417
++ export MACOSWORLD_AWS_INSTANCE_STATE_FILE=./run_log/gemini3flash_baseline5_snapshot_usedApps_en_20260417_instance_state.json
++ MACOSWORLD_AWS_INSTANCE_STATE_FILE=./run_log/gemini3flash_baseline5_snapshot_usedApps_en_20260417_instance_state.json
++ export MACOSWORLD_AWS_INITIAL_SNAPSHOT_NAME=snapshot_usedApps_en
++ MACOSWORLD_AWS_INITIAL_SNAPSHOT_NAME=snapshot_usedApps_en
++ exec bash /Users/zhangkangning/code_repos/macosworld/scripts/run_aws_eval.sh
+scripts/run_gemini_baseline5_dual_by_snapshot.sh: line 70: 18357 Terminated: 15          ( export MACOSWORLD_INSTANCE_ID="$instance_id"; export MACOSWORLD_SSH_HOST="$dns_name"; export MACOSWORLD_SSH_PKEY="$PEM"; export MACOSWORLD_GUI_AGENT_NAME="$GUI_AGENT_NAME"; export MACOSWORLD_PATHS_TO_EVAL_TASKS="$task_dir"; export MACOSWORLD_BASE_SAVE_DIR="$result_dir"; export MACOSWORLD_AWS_INSTANCE_STATE_FILE="$state_file"; export MACOSWORLD_AWS_INITIAL_SNAPSHOT_NAME="$initial_snapshot"; exec bash "$ROOT_DIR/scripts/run_aws_eval.sh" )

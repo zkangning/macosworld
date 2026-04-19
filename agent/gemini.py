@@ -1,25 +1,52 @@
 import time
-from typing import Any
+from typing import Any, Optional
 
 from PIL import Image
 from io import BytesIO
 import os
 import json
+import base64
+import requests
+import httpx
+from openai import OpenAI
 
-from google.api_core.exceptions import InvalidArgument
-from vertexai.preview.generative_models import Image as VertexImage
+try:
+    from google.api_core.exceptions import InvalidArgument
+    from vertexai.preview.generative_models import Image as VertexImage
+    from vertexai.preview.generative_models import (
+        GenerativeModel,
+        HarmBlockThreshold,
+        HarmCategory,
+        Content,
+        Part
+    )
+    _VERTEXAI_AVAILABLE = True
+except ModuleNotFoundError:
+    InvalidArgument = Exception
+    VertexImage = None
+    GenerativeModel = None
+    Content = None
+    Part = None
+    _VERTEXAI_AVAILABLE = False
 
-from vertexai.preview.generative_models import (
-    GenerativeModel,
-    HarmBlockThreshold,
-    HarmCategory,
-    Content,
-    Part
-)
+    class _DummyHarmBlockThreshold:
+        BLOCK_ONLY_HIGH = "BLOCK_ONLY_HIGH"
+
+    class _DummyHarmCategory:
+        HARM_CATEGORY_UNSPECIFIED = "HARM_CATEGORY_UNSPECIFIED"
+        HARM_CATEGORY_HATE_SPEECH = "HARM_CATEGORY_HATE_SPEECH"
+        HARM_CATEGORY_DANGEROUS_CONTENT = "HARM_CATEGORY_DANGEROUS_CONTENT"
+        HARM_CATEGORY_HARASSMENT = "HARM_CATEGORY_HARASSMENT"
+        HARM_CATEGORY_SEXUALLY_EXPLICIT = "HARM_CATEGORY_SEXUALLY_EXPLICIT"
+
+    HarmBlockThreshold = _DummyHarmBlockThreshold
+    HarmCategory = _DummyHarmCategory
 
 from utils.VNCClient import VNCClient_SSH
 from utils.log import print_message
 from utils.timeout import timeout
+from agent.llm_utils import pil_to_b64
+from agent.gui_action_parser import GENERAL_ACTION_OUTPUT_RULES, parse_gui_actions
 
 
 
@@ -39,6 +66,8 @@ move_to 0.25 0.5
 key_press command-c
 left_click
 ```
+
+Use only the actions listed below. Do not invent new action names.
 
 Available actions and their parameters:
 
@@ -76,10 +105,10 @@ Available actions and their parameters:
 - "scroll_up": Scroll up by proportion of screen height
   Required params: {"amount": float 0-1}
 
-- "scroll_left": Scroll up by proportion of screen width
+- "scroll_left": Scroll left by proportion of screen width
   Required params: {"amount": float 0-1}
 
-- "scroll_right": Scroll up by proportion of screen width
+- "scroll_right": Scroll right by proportion of screen width
   Required params: {"amount": float 0-1}
 
 2. Keyboard Actions:
@@ -110,6 +139,8 @@ Important Notes:
 - The control commands (wait, fail, done) must be the only command issued in a round. If one of these commands is used, no other actions should be provided alongside it.
 - Return only the actions in a backtick-wrapped plaintext code block, one line per action, no other text
 """
+GEMINI_SYSTEM_PROMPT += GENERAL_ACTION_OUTPUT_RULES
+GLM_SYSTEM_PROMPT = GEMINI_SYSTEM_PROMPT
 
 GEMINI_SAFETY_CONFIG = {
     HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_ONLY_HIGH,
@@ -120,11 +151,122 @@ GEMINI_SAFETY_CONFIG = {
 }
 
 def pil_to_vertex(img: Image.Image) -> str:
+    if not _VERTEXAI_AVAILABLE:
+        raise RuntimeError("Vertex AI dependencies are not installed.")
     with BytesIO() as image_buffer:
         img.save(image_buffer, format="PNG")
         byte_data = image_buffer.getvalue()
         img_vertex = VertexImage.from_bytes(byte_data)
     return img_vertex
+
+
+def pil_to_gateway_inline_data(img: Image.Image) -> dict:
+    with BytesIO() as image_buffer:
+        img.save(image_buffer, format="PNG")
+        byte_data = image_buffer.getvalue()
+    return {
+        "mimeType": "image/png",
+        "data": base64.b64encode(byte_data).decode("utf-8")
+    }
+
+
+class OpenAILikeGeminiGatewayClient:
+    def __init__(self, api_key: str, base_url: str):
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+
+    def generate_content(
+        self,
+        parts: list,
+        system_text: str,
+        temperature: float,
+        max_output_tokens: int,
+        top_p: float,
+        seed: int,
+        thinking_level: str,
+        include_thoughts: bool,
+    ) -> dict:
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": parts
+                }
+            ],
+            "systemInstruction": {
+                "parts": [
+                    {
+                        "text": system_text
+                    }
+                ]
+            },
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_output_tokens,
+                "topP": top_p,
+                "seed": seed,
+            }
+        }
+
+        if thinking_level != "NONE":
+            payload["generationConfig"]["thinkingConfig"] = {
+                "thinkingLevel": thinking_level,
+                "includeThoughts": include_thoughts,
+            }
+
+        response = requests.post(
+            f"{self.base_url}/v1:generateContent",
+            headers={
+                "api-key": self.api_key,
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=120,
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+class OpenAICompatibleVisionClient:
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str,
+        proxy_url: str = "",
+        default_headers: Optional[dict[str, str]] = None,
+    ):
+        http_client = httpx.Client(proxy=proxy_url) if proxy_url else None
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url.rstrip("/"),
+            http_client=http_client,
+            default_headers=default_headers or None,
+        )
+
+    def chat_completions(
+        self,
+        model: str,
+        system_text: str,
+        content: list,
+        temperature: float,
+        max_output_tokens: int,
+        top_p: float,
+        extra_body: Optional[dict[str, Any]] = None,
+    ):
+        request_kwargs = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_text},
+                {"role": "user", "content": content},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_output_tokens,
+            "top_p": top_p,
+            "stream": False,
+        }
+        if extra_body:
+            request_kwargs["extra_body"] = extra_body
+        return self.client.chat.completions.create(**request_kwargs)
 
 class Gemini_General_Agent:
     def __init__(
@@ -138,7 +280,7 @@ class Gemini_General_Agent:
         temperature: float,
         safety_config: dict,
     ):
-        self.prompt_client = GenerativeModel(model)
+        self.model = model
         self.safety_config = safety_config
         self.system_prompt = system_prompt
         self.remote_client = remote_client
@@ -154,6 +296,26 @@ class Gemini_General_Agent:
         self.token_usage = []
         self.total_prompt_tokens = 0
         self.total_candidates_tokens = 0
+
+        self.gateway_base_url = os.environ.get("GEMINI_BASE_URL", "").strip()
+        self.gateway_api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        self.gateway_thinking_level = os.environ.get("GEMINI_THINKING_LEVEL", "NONE").strip() or "NONE"
+        self.gateway_include_thoughts = os.environ.get("GEMINI_INCLUDE_THOUGHTS", "false").strip().lower() == "true"
+        self.gateway_seed = int(os.environ.get("GEMINI_SEED", "0"))
+
+        if self.gateway_base_url and self.gateway_api_key:
+            self.prompt_client = OpenAILikeGeminiGatewayClient(
+                api_key=self.gateway_api_key,
+                base_url=self.gateway_base_url,
+            )
+            self.use_gateway = True
+        else:
+            if not _VERTEXAI_AVAILABLE:
+                raise RuntimeError(
+                    "Gemini Vertex path requires vertexai to be installed, or set GEMINI_BASE_URL and GEMINI_API_KEY."
+                )
+            self.prompt_client = GenerativeModel(model)
+            self.use_gateway = False
 
     def construct_user_prompt(self, task: str, screenshots: list):
         if len(screenshots) == 0:
@@ -174,6 +336,50 @@ class Gemini_General_Agent:
     
     def call_agent(self, task: str):
         prompt = self.construct_user_prompt(task = task, screenshots = self.screenshots)
+
+        if self.use_gateway:
+            gateway_prompt = prompt[1:] if len(prompt) > 0 and prompt[0] == self.system_prompt else prompt
+            request_parts = []
+            for element in gateway_prompt:
+                if isinstance(element, str):
+                    request_parts.append({"text": element})
+                elif isinstance(element, Image.Image):
+                    request_parts.append({"inlineData": pil_to_gateway_inline_data(element)})
+                else:
+                    raise TypeError(f"Unsupported prompt element type for Gemini gateway: {type(element)}")
+
+            response = self.prompt_client.generate_content(
+                parts=request_parts,
+                system_text=self.system_prompt,
+                temperature=self.temperature,
+                max_output_tokens=self.max_tokens,
+                top_p=self.top_p,
+                seed=self.gateway_seed,
+                thinking_level=self.gateway_thinking_level,
+                include_thoughts=self.gateway_include_thoughts,
+            )
+
+            usage_metadata = response.get("usageMetadata", {})
+            prompt_tokens = usage_metadata.get("promptTokenCount", 0)
+            candidate_tokens = usage_metadata.get("candidatesTokenCount", 0)
+            self.token_usage.append(
+                {
+                    "prompt_token_count": prompt_tokens,
+                    "candidates_token_count": candidate_tokens
+                }
+            )
+            self.total_prompt_tokens += prompt_tokens
+            self.total_candidates_tokens += candidate_tokens
+
+            response_parts = response.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+            response_text = "\n".join(
+                part.get("text", "")
+                for part in response_parts
+                if isinstance(part, dict) and "text" in part
+            ).strip()
+            if response_text == "":
+                raise RuntimeError(f"Empty Gemini gateway response: {json.dumps(response, ensure_ascii=False)[:1000]}")
+            return response_text
 
         response = self.prompt_client.generate_content(
             prompt,
@@ -200,122 +406,7 @@ class Gemini_General_Agent:
         return response_text
     
     def parse_agent_output(self, agent_output):
-        """
-        Parse the raw output string from the GUI agent into a list of actions.
-        Each action is a dict with an "action" key and any required parameters.
-        
-        This function is robust to:
-        - Extra surrounding backticks or triple backticks
-        - Extra spaces and non-action text lines
-        - Parameters provided with "key=value" format
-        - Incomplete or misformatted lines (which will print an error and skip that line)
-        """
-        valid_actions = {"move_to", "left_click", "middle_click", "right_click", "double_click",
-                        "scroll_down", "scroll_up", "type_text", "key_press", "wait", "fail", "done"}
-        actions = []
-        
-        # Remove any surrounding backticks or triple backticks
-        agent_output = agent_output.strip()
-        if agent_output.startswith("```") and agent_output.endswith("```"):
-            agent_output = agent_output[3:-3].strip()
-        # Also remove any extra single backticks
-        agent_output = agent_output.strip("`").strip()
-        
-        # Split the output into lines
-        lines = agent_output.splitlines()
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                # Split the line into tokens by whitespace.
-                # Note: for type_text the text may contain spaces.
-                tokens = line.split()
-                if not tokens:
-                    continue
-                # The first token should be a valid action command.
-                action_cmd = tokens[0].strip().lower()
-                if action_cmd not in valid_actions:
-                    # If the line does not begin with a valid command, ignore it.
-                    continue
-
-                action_dict = {"action": action_cmd}
-                
-                # Parse parameters based on the action command.
-                if action_cmd in ["move_to", "drag_to"]:
-                    # Expecting two parameters: x and y.
-                    if len(tokens) < 3:
-                        print(f"Error parsing line (move_to requires 2 parameters): {line}")
-                        continue
-                    def parse_float(token):
-                        if "=" in token:
-                            token = token.split("=")[-1]
-                        return float(token)
-                    action_dict["x"] = parse_float(tokens[1])
-                    action_dict["y"] = parse_float(tokens[2])
-                elif action_cmd in ["mouse_down", "mouse_up"]:
-                    if len(tokens) < 2:
-                        print(f"Error parsing line ({action_cmd} requires a button parameter): {line}")
-                        continue
-                    button = tokens[1]
-                    if "=" in button:
-                        button = button.split("=")[-1]
-                    action_dict["button"] = button.lower()
-                elif action_cmd in ["scroll_down", "scroll_up"]:
-                    # Expecting one parameter: amount.
-                    if len(tokens) < 2:
-                        print(f"Error parsing line ({action_cmd} requires 1 parameter): {line}")
-                        continue
-                    token = tokens[1]
-                    if "=" in token:
-                        token = token.split("=")[-1]
-                    try:
-                        action_dict["amount"] = float(token)
-                    except Exception as e:
-                        print(f"Error parsing parameter for {action_cmd}: {line} - {e}")
-                        continue
-                elif action_cmd == "wait":
-                    # Expecting one parameter: seconds.
-                    if len(tokens) < 2:
-                        print(f"Error parsing line (wait requires 1 parameter): {line}")
-                        continue
-                    token = tokens[1]
-                    if "=" in token:
-                        token = token.split("=")[-1]
-                    try:
-                        action_dict["seconds"] = float(token)
-                    except Exception as e:
-                        print(f"Error parsing parameter for wait: {line} - {e}")
-                        continue
-                elif action_cmd == "type_text":
-                    # Instead of stripping unconditionally, get the raw text after the command.
-                    raw_text = line[len(tokens[0]):]
-                    # If the text is entirely whitespace, preserve it.
-                    if raw_text.strip() == "":
-                        text = raw_text
-                    else:
-                        # Otherwise, remove leading/trailing spaces and normalize spaces in the middle.
-                        text = ' '.join(raw_text.split())
-                    action_dict["text"] = text
-                elif action_cmd == "key_press":
-                    # Expecting one parameter: key.
-                    if len(tokens) < 2:
-                        print(f"Error parsing line (key_press requires a key parameter): {line}")
-                        continue
-                    key = tokens[1]
-                    if "=" in key:
-                        key = key.split("=")[-1]
-                    action_dict["key"] = key
-                # For actions that require no parameters (left_click, middle_click, right_click, double_click, fail, done)
-                # no extra parsing is needed.
-                
-                actions.append(action_dict)
-            except Exception as e:
-                print(f"Error parsing line: {line} - {e}")
-                continue
-                
-        return actions
+        return parse_gui_actions(agent_output)
     
     def execute_actions(self, actions):
         """
@@ -392,7 +483,10 @@ class Gemini_General_Agent:
         # Capture screenshot
         print_message(title = f'Task {task_id}/{env_language}/{task_language} Step {current_step}/{max_steps}', content = 'Capturing screenshot...')
         current_screenshot = self.remote_client.capture_screenshot()
-        self.screenshots.append(pil_to_vertex(current_screenshot))
+        if self.use_gateway:
+            self.screenshots.append(current_screenshot.copy())
+        else:
+            self.screenshots.append(pil_to_vertex(current_screenshot))
         if self.only_n_most_recent_images > 0:
             self.screenshots = self.screenshots[-self.only_n_most_recent_images:]
         
@@ -420,3 +514,172 @@ class Gemini_General_Agent:
     
     def save_conversation_history(self, save_dir: str):
         pass
+
+
+class Gemini_OpenAICompat_Agent(Gemini_General_Agent):
+    def __init__(
+        self,
+        model: str,
+        system_prompt: str,
+        remote_client: VNCClient_SSH,
+        only_n_most_recent_images: int,
+        max_tokens: int,
+        top_p: float,
+        temperature: float,
+        base_url_env: str,
+        api_key_env: str,
+        thinking_mode_env: str,
+        proxy_env: str = "",
+    ):
+        self.model = model
+        self.safety_config = {}
+        self.system_prompt = system_prompt
+        self.remote_client = remote_client
+
+        self.max_tokens = max_tokens
+        self.only_n_most_recent_images = only_n_most_recent_images
+        self.top_p = top_p
+        self.temperature = temperature
+
+        self.messages = None
+        self.screenshots = []
+
+        self.token_usage = []
+        self.total_prompt_tokens = 0
+        self.total_candidates_tokens = 0
+
+        self.gateway_base_url = os.environ.get(base_url_env, "").strip()
+        self.gateway_api_key = os.environ.get(api_key_env, "").strip()
+        self.gateway_proxy_url = os.environ.get(proxy_env, "").strip() if proxy_env else ""
+        self.gateway_thinking_mode = os.environ.get(thinking_mode_env, "auto").strip().lower() or "auto"
+        self.is_openrouter = "openrouter.ai" in self.gateway_base_url.lower()
+
+        default_headers = {}
+        openrouter_site_url = os.environ.get("OPENROUTER_SITE_URL", "").strip()
+        openrouter_app_name = os.environ.get("OPENROUTER_APP_NAME", "").strip()
+        if self.is_openrouter and openrouter_site_url:
+            default_headers["HTTP-Referer"] = openrouter_site_url
+        if self.is_openrouter and openrouter_app_name:
+            default_headers["X-Title"] = openrouter_app_name
+
+        if self.gateway_base_url == "" or self.gateway_api_key == "":
+            raise ValueError(
+                f"Gemini-style OpenAI-compatible agent requires {base_url_env} and {api_key_env}."
+            )
+
+        self.prompt_client = OpenAICompatibleVisionClient(
+            api_key=self.gateway_api_key,
+            base_url=self.gateway_base_url,
+            proxy_url=self.gateway_proxy_url,
+            default_headers=default_headers,
+        )
+        self.use_gateway = False
+
+    def _format_openai_compat_content(self, elements: list):
+        formatted = []
+        for element in elements:
+            if isinstance(element, str):
+                formatted.append({"type": "text", "text": element})
+            elif isinstance(element, Image.Image):
+                formatted.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": pil_to_b64(element, add_prefix=True),
+                            "detail": "high",
+                        },
+                    }
+                )
+            else:
+                raise TypeError(f"Unsupported prompt element type for OpenAI-compatible vision client: {type(element)}")
+        return formatted
+
+    def call_agent(self, task: str):
+        prompt = self.construct_user_prompt(task=task, screenshots=self.screenshots)
+        prompt_body = prompt[1:] if len(prompt) > 0 and prompt[0] == self.system_prompt else prompt
+        formatted_user_prompt = self._format_openai_compat_content(prompt_body)
+
+        extra_body = None
+        if self.is_openrouter:
+            if self.gateway_thinking_mode == "on":
+                extra_body = {"reasoning": {"enabled": True}}
+            elif self.gateway_thinking_mode == "off":
+                extra_body = {"reasoning": {"enabled": False}}
+        else:
+            if self.gateway_thinking_mode == "on":
+                extra_body = {"enable_thinking": True}
+            elif self.gateway_thinking_mode == "off":
+                extra_body = {"enable_thinking": False}
+
+        response = self.prompt_client.chat_completions(
+            model=self.model,
+            system_text=self.system_prompt,
+            content=formatted_user_prompt,
+            temperature=self.temperature,
+            max_output_tokens=self.max_tokens,
+            top_p=self.top_p,
+            extra_body=extra_body,
+        )
+
+        usage = getattr(response, "usage", None)
+        usage_dict = usage.model_dump() if usage is not None and hasattr(usage, "model_dump") else {}
+        prompt_tokens = usage_dict.get("prompt_tokens", 0)
+        completion_tokens = usage_dict.get("completion_tokens", 0)
+        self.token_usage.append(
+            {
+                "prompt_token_count": prompt_tokens,
+                "candidates_token_count": completion_tokens,
+            }
+        )
+        self.total_prompt_tokens += prompt_tokens
+        self.total_candidates_tokens += completion_tokens
+
+        message = response.choices[0].message
+        content = message.content
+        if isinstance(content, str):
+            response_text = content
+        elif isinstance(content, list):
+            response_text = "\n".join(
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and "text" in item
+            ).strip()
+        else:
+            response_text = str(content or "").strip()
+
+        if response_text == "":
+            raise RuntimeError(f"Empty OpenAI-compatible vision response for model {self.model}.")
+
+        return response_text
+
+    def step(
+        self,
+        task_id: int,
+        current_step: int,
+        max_steps: int,
+        env_language: str,
+        task_language: str,
+        task: str,
+        task_step_timeout: int,
+        save_dir: str,
+    ):
+        print_message(title = f'Task {task_id}/{env_language}/{task_language} Step {current_step}/{max_steps}', content = 'Capturing screenshot...')
+        current_screenshot = self.remote_client.capture_screenshot()
+        self.screenshots.append(current_screenshot.copy())
+        if self.only_n_most_recent_images > 0:
+            self.screenshots = self.screenshots[-self.only_n_most_recent_images:]
+
+        print_message(title = f'Task {task_id}/{env_language}/{task_language} Step {current_step}/{max_steps}', content = 'Calling GUI agent...')
+        raw_response = self.call_agent(task = task)
+
+        print_message(title = f'Task {task_id}/{env_language}/{task_language} Step {current_step}/{max_steps}', content = 'Actuating...')
+        parsed_actions = self.parse_agent_output(raw_response)
+        status, _ = self.execute_actions(parsed_actions)
+
+        current_screenshot.save(os.path.join(save_dir, 'context', f'step_{str(current_step).zfill(3)}.png'))
+        with open(os.path.join(save_dir, 'context', f'step_{str(current_step).zfill(3)}_raw_response.txt'), 'w') as f:
+            f.write(raw_response)
+        with open(os.path.join(save_dir, 'context', f'step_{str(current_step).zfill(3)}_parsed_actions.json'), 'w') as f:
+            json.dump(parsed_actions, f, indent=4)
+
+        return status

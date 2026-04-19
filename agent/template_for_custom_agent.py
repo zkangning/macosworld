@@ -8,7 +8,7 @@ class CustomGUIAgent:
         self,
         task_id: str,           # ID/UUID of the current task
         current_step: int,      # 1, 2, 3, ...
-        max_steps: int,         # e.g. 15
+        max_steps: int,         # e.g. 20
         env_language: str,      # en/zh/ar/ja/ru
         task_language: str,     # en/zh/ar/ja/ru
         task: str,              # e.g. "Set volume to 25%."

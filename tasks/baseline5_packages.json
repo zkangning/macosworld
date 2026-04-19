@@ -1,0 +1,38 @@
+{
+  "name": "baseline5",
+  "language": "en",
+  "description": "Fixed five-domain English baseline/test split for macOSWorld.",
+  "domains": [
+    "file_management",
+    "media",
+    "productivity",
+    "sys_and_interface",
+    "sys_apps"
+  ],
+  "packages": {
+    "snapshot_used_en": {
+      "path": "tasks/baseline5_snapshot_used_en",
+      "count": 112,
+      "by_domain": {
+        "file_management": 29,
+        "productivity": 16,
+        "sys_and_interface": 29,
+        "sys_apps": 38
+      }
+    },
+    "snapshot_usedApps_en": {
+      "path": "tasks/baseline5_snapshot_usedApps_en",
+      "count": 31,
+      "by_domain": {
+        "media": 12,
+        "productivity": 19
+      }
+    }
+  },
+  "total_count": 143,
+  "notes": [
+    "These package directories contain symlinks to the canonical task JSON files under tasks/<domain>/.",
+    "Use the two packages as stable baseline/test subsets for future runs.",
+    "Keep snapshot_used_en and snapshot_usedApps_en on separate EC2 Mac instances to avoid cross-snapshot relaunch churn."
+  ]
+}

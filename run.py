@@ -23,7 +23,7 @@ parser.add_argument('--task_max_attempts', type=int, default=2)
 parser.add_argument('--task_step_timeout', type=int, default=120)
 
 parser.add_argument('--gui_agent_name', type=str, required=True)
-parser.add_argument('--max-steps', type=int, default=15)
+parser.add_argument('--max-steps', type=int, default=20)
 parser.add_argument('--base_save_dir', type=str, default='./results')
 parser.add_argument('--paths_to_eval_tasks', nargs='+', required=True)
 parser.add_argument('--languages', nargs='+', required=True)
@@ -109,4 +109,3 @@ while True:
         print_message(f'Testbench terminated after timeout {TESTBENCH_TIMEOUT_SECONDS}s. Interrupted task will be cleaned up and re-benchmarked.', title = 'run.py')
     finally:
         srv.close()
-

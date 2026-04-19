@@ -1,0 +1,34 @@
++ load_runtime /Users/zhangkangning/code_repos/macosworld/run_log/baseline5_gemini3flash_20260417/gemini3flash_baseline5_snapshot_usedApps_en_20260417.runtime.env
++ local runtime_file=/Users/zhangkangning/code_repos/macosworld/run_log/baseline5_gemini3flash_20260417/gemini3flash_baseline5_snapshot_usedApps_en_20260417.runtime.env
++ source /Users/zhangkangning/code_repos/macosworld/run_log/baseline5_gemini3flash_20260417/gemini3flash_baseline5_snapshot_usedApps_en_20260417.runtime.env
+++ label=usedApps_en
+++ host_id=h-0be9bd06f7d08b74c
+++ instance_id=i-0063c48c9b80e5abd
+++ dns_name=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
+++ image_id=ami-07f4fd69378358c18
+++ initial_snapshot=snapshot_usedApps_en
+++ task_dir=./tasks/baseline5_snapshot_usedApps_en
+++ result_dir=./results/gemini3flash_baseline5_snapshot_usedApps_en_20260417
+++ state_file=./run_log/gemini3flash_baseline5_snapshot_usedApps_en_20260417_instance_state.json
+++ gui_agent_name=gemini-3-flash
++ export MACOSWORLD_INSTANCE_ID=i-0063c48c9b80e5abd
++ MACOSWORLD_INSTANCE_ID=i-0063c48c9b80e5abd
++ export MACOSWORLD_SSH_HOST=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ MACOSWORLD_SSH_HOST=ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com
++ export MACOSWORLD_SSH_PKEY=/Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem
++ MACOSWORLD_SSH_PKEY=/Users/zhangkangning/.ssh/macosworld-gemini-smoke-20260403-key.pem
++ export MACOSWORLD_GUI_AGENT_NAME=qwen3-vl-235b-a22b-thinking
++ MACOSWORLD_GUI_AGENT_NAME=qwen3-vl-235b-a22b-thinking
++ export MACOSWORLD_PATHS_TO_EVAL_TASKS=./tasks/baseline5_snapshot_usedApps_en
++ MACOSWORLD_PATHS_TO_EVAL_TASKS=./tasks/baseline5_snapshot_usedApps_en
++ export MACOSWORLD_LANGUAGES=task_en_env_en
++ MACOSWORLD_LANGUAGES=task_en_env_en
++ export MACOSWORLD_BASE_SAVE_DIR=./results/gemini3flash_baseline5_snapshot_usedApps_en_20260417
++ MACOSWORLD_BASE_SAVE_DIR=./results/gemini3flash_baseline5_snapshot_usedApps_en_20260417
++ export MACOSWORLD_AWS_INSTANCE_STATE_FILE=./run_log/gemini3flash_baseline5_snapshot_usedApps_en_20260417_instance_state.json
++ MACOSWORLD_AWS_INSTANCE_STATE_FILE=./run_log/gemini3flash_baseline5_snapshot_usedApps_en_20260417_instance_state.json
++ export MACOSWORLD_AWS_INITIAL_SNAPSHOT_NAME=snapshot_usedApps_en
++ MACOSWORLD_AWS_INITIAL_SNAPSHOT_NAME=snapshot_usedApps_en
++ export MACOSWORLD_MAX_STEPS=20
++ MACOSWORLD_MAX_STEPS=20
++ exec bash /Users/zhangkangning/code_repos/macosworld/scripts/run_aws_eval.sh

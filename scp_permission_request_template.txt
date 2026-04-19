@@ -1,0 +1,85 @@
+主题：申请为 264901105690 账号放行 ap-southeast-1 的 macOSWorld AWS 评测所需 SCP 权限
+
+我目前需要在 AWS 上运行 macOSWorld 的英文 smoke test。当前成员账号信息如下：
+
+- AWS member account：264901105690
+- AWS Organizations ID：o-y5qrewy2n3
+- management account：058264288200
+- 目标区域：ap-southeast-1
+- 目标资源类型：EC2 Dedicated mac2 Hosts / mac2.metal
+- 评测 IAM 用户：arn:aws:iam::264901105690:user/macosworld-eval
+
+当前已经确认，成员账号内的 IAM 权限不是主要问题；真正的阻塞是 AWS Organizations 的 SCP 显式拒绝。实际报错为：
+
+- 被拒绝动作：ec2:AllocateHosts
+- 被命中的 SCP：arn:aws:organizations::058264288200:policy/o-y5qrewy2n3/service_control_policy/p-gmz6ftd2
+
+业务需求：
+
+- 仅在 ap-southeast-1 运行 macOSWorld 英文 benchmark
+- 仅需启动 mac2.metal Dedicated Host / Instance
+- 需要支持 benchmark 过程中的 root volume replace 恢复机制
+
+因此请协助对该成员账号做最小范围放行。关键点如下：
+
+- 由于当前是 SCP 显式 deny，单纯在成员账号里增加 IAM 权限无效
+- 需要修改、豁免、解绑命中的 SCP，或将该账号移动到不继承该 deny 的 OU
+- 如果组织使用 AWS Control Tower，建议通过新增自定义 SCP 或调整 OU 挂载方式实现，不建议直接破坏 Control Tower 托管策略
+
+建议的最小放行动作如下，仅限 ap-southeast-1：
+
+- ec2:AllocateHosts
+- ec2:ReleaseHosts
+- ec2:RunInstances
+- ec2:TerminateInstances
+- ec2:StartInstances
+- ec2:StopInstances
+- ec2:RebootInstances
+- ec2:CreateReplaceRootVolumeTask
+- ec2:DescribeReplaceRootVolumeTasks
+- ec2:DescribeHosts
+- ec2:DescribeInstances
+- ec2:DescribeImages
+- ec2:DescribeVpcs
+- ec2:DescribeSubnets
+- ec2:DescribeSecurityGroups
+- ec2:DescribeKeyPairs
+- ec2:DescribeTags
+- ec2:CreateSecurityGroup
+- ec2:DeleteSecurityGroup
+- ec2:AuthorizeSecurityGroupIngress
+- ec2:RevokeSecurityGroupIngress
+- ec2:CreateKeyPair
+- ec2:DeleteKeyPair
+- ec2:CreateTags
+- ec2:DeleteTags
+
+可接受的实现方式任选其一：
+
+- 方式 1：将账号 264901105690 从命中 p-gmz6ftd2 的 OU 或账号级挂载中豁免
+- 方式 2：从该账号或其 OU 上 detach p-gmz6ftd2，并保留其他必要的基础 SCP
+- 方式 3：修改 p-gmz6ftd2 的 deny 条件，对账号 264901105690 在 ap-southeast-1 做例外处理
+
+验证标准：
+
+- 成员账号下用户 macosworld-eval 可以在 ap-southeast-1 成功执行 ec2:AllocateHosts
+- 可以成功启动 mac2.metal 实例
+- 可以成功执行 ec2:CreateReplaceRootVolumeTask
+
+如果需要，我这边可以在你们调整后立即做一次命令级验证并反馈结果。
+
+补充说明：
+
+- 成员账号内用户 macosworld-eval 已挂 AdministratorAccess
+- 但 AWS 官方策略评估逻辑里，SCP 的显式 deny 会覆盖 IAM allow，所以必须在 Organizations 层处理
+
+官方参考：
+
+- IAM 策略评估逻辑：https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html
+- SCP 说明：https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html
+- Attach policies：https://docs.aws.amazon.com/organizations/latest/userguide/orgs_policies_attach.html
+- Detach policies：https://docs.aws.amazon.com/organizations/latest/userguide/orgs_policies_detach.html
+- detach-policy CLI：https://docs.aws.amazon.com/cli/latest/reference/organizations/detach-policy.html
+- Control Tower guidance：https://docs.aws.amazon.com/controltower/latest/userguide/orgs-guidance.html
+
+谢谢。

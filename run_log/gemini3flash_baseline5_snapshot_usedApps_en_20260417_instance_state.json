@@ -1,0 +1,17 @@
+{
+  "i-0063c48c9b80e5abd": {
+    "active_instance_id": "i-0063c48c9b80e5abd",
+    "availability_zone": "ap-southeast-1a",
+    "host_id": "h-0be9bd06f7d08b74c",
+    "iam_instance_profile_arn": null,
+    "instance_name": "gemini3flash-baseline5-usedApps-en-20260417",
+    "instance_type": "mac2.metal",
+    "key_name": "macosworld-gemini-smoke-20260403-key",
+    "security_group_ids": [
+      "sg-0324bde9759ab4283"
+    ],
+    "snapshot_name": "snapshot_usedApps_en",
+    "ssh_host": "ec2-47-129-98-6.ap-southeast-1.compute.amazonaws.com",
+    "subnet_id": "subnet-0523d71491e819dbb"
+  }
+}

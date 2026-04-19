@@ -4,12 +4,23 @@ from PIL import Image
 import time
 import uuid
 # import copy
+import paramiko
 from vncdotool import api
 from vncdotool.client import KEYMAP
 from sshtunnel import SSHTunnelForwarder
 from utils.log import print_message
 from utils.vmware_utils import VMwareTools
 import subprocess
+
+
+if not hasattr(paramiko, "DSSKey"):
+    # Paramiko 4 removed DSSKey, but sshtunnel 0.4.0 still references it.
+    class _UnsupportedDSSKey(paramiko.PKey):
+        @classmethod
+        def from_private_key_file(cls, *args, **kwargs):
+            raise paramiko.SSHException("DSA keys are unsupported in paramiko>=4")
+
+    paramiko.DSSKey = _UnsupportedDSSKey
 
 class AttributeContainer:
     pass
@@ -121,28 +132,67 @@ class VNCClient_SSH:
     def check_ssh_connectivity(self):
         """Check if SSH connection can be established. Returns True if successful, False otherwise."""
         try:
-            temp_tunnel = SSHTunnelForwarder(
-                (self.ssh_host, 22),
-                ssh_username=self.guest_username,
-                ssh_pkey=self.ssh_pkey,
-                remote_bind_address=('localhost', 5900),
-                allow_agent=False,
-                host_pkey_directories=None,
+            ssh_command = self._ssh_base_command() + ['exit 0']
+            result = subprocess.run(
+                ssh_command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
-            temp_tunnel.start()
-            temp_tunnel.stop()
-            return True
+            return result.returncode == 0
         except Exception:
             return False
+
+    def _ssh_base_command(self):
+        return [
+            'ssh',
+            '-o', 'BatchMode=yes',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            '-o', 'ConnectTimeout=10',
+            '-i', self.ssh_pkey,
+            f'{self.guest_username}@{self.ssh_host}',
+        ]
+
+    @staticmethod
+    def _is_transient_ssh_error(message: str) -> bool:
+        if not isinstance(message, str):
+            return False
+        transient_patterns = (
+            'Connection reset by peer',
+            'Connection closed by',
+            'kex_exchange_identification',
+            'Connection timed out',
+            'Operation timed out',
+            'ssh: connect to host',
+            'Broken pipe',
+        )
+        return any(pattern in message for pattern in transient_patterns)
         
     def run_ssh_command(self, command: str) -> str:
-        command = command.replace('\\', '\\\\').replace('"', '\\"').replace('$', '\\$')
-        ssh_command = f'ssh -o StrictHostKeyChecking=no -i "{self.ssh_pkey}" {self.guest_username}@{self.ssh_host} "{command}"'
-        try:
-            output = subprocess.check_output(ssh_command, shell=True, stderr=subprocess.STDOUT).decode().strip()
-            return True, output
-        except Exception as e: # subprocess.CalledProcessError
-            return False, e
+        ssh_command = self._ssh_base_command() + [command]
+        last_error = None
+        for attempt in range(1, self.retry_attempts + 1):
+            try:
+                output = subprocess.check_output(
+                    ssh_command,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                ).strip()
+                return True, output
+            except subprocess.CalledProcessError as e:
+                output = (e.output or "").strip()
+                last_error = output or str(e)
+                if attempt < self.retry_attempts and self._is_transient_ssh_error(last_error):
+                    time.sleep(self.retry_delay)
+                    continue
+                return False, e
+            except Exception as e: # subprocess.CalledProcessError
+                last_error = str(e)
+                if attempt < self.retry_attempts and self._is_transient_ssh_error(last_error):
+                    time.sleep(self.retry_delay)
+                    continue
+                return False, e
+        return False, RuntimeError(last_error or "Unknown SSH command failure")
 
     def connect(self):
         """Connect to the VNC server, with retries on failure."""
@@ -451,4 +501,3 @@ class VNCClient_SSH:
         """Ensure that the VNC client is connected, and attempt to reconnect if needed."""
         if self.client is None:
             self.connect()
-

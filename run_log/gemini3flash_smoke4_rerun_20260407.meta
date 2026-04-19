@@ -1,0 +1,8 @@
+bootstrap_instance_id=i-0fda36f080d9726ef
+bootstrap_host_id=h-04e49661c1901b945
+bootstrap_ssh_host=ec2-13-212-81-180.ap-southeast-1.compute.amazonaws.com
+snapshot_name=snapshot_used_en
+reset_mode=smart
+hard_reset_strategy=relaunch
+result_dir=./results/gemini3flash_smoke4_rerun_20260407
+state_file=./run_log/gemini3flash_smoke4_rerun_20260407_instance_state.json
