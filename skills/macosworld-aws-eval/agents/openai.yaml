@@ -1,0 +1,7 @@
+interface:
+  display_name: "macOSWorld AWS Eval"
+  short_description: "Run and debug macOSWorld EC2 Mac evaluation."
+  default_prompt: "Use $macosworld-aws-eval to configure, run, or debug macOSWorld evaluation on AWS."
+
+policy:
+  allow_implicit_invocation: true
