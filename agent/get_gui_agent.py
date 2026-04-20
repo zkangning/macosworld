@@ -45,6 +45,25 @@ def get_gui_agent(gui_agent_name, remote_client):
                 "mm_skills_download/mac_4_18_skills",
             ),
         )
+    if gui_agent_name == "openai-skill-mm-branch" or gui_agent_name.endswith("/skill-mm-branch"):
+        from agent.openai_skill import OpenAISkillAgent
+
+        model_name = (
+            gui_agent_name.rsplit("/", 1)[0]
+            if gui_agent_name.endswith("/skill-mm-branch") and gui_agent_name != "openai-skill-mm-branch"
+            else os.environ.get("MACOSWORLD_OPENAI_SKILL_MODEL", "gpt-4o").strip() or "gpt-4o"
+        )
+        return OpenAISkillAgent(
+            model=model_name,
+            remote_client=remote_client,
+            screenshot_rolling_window=image_window,
+            top_p=0.9,
+            temperature=1.0,
+            skills_library_dir=os.environ.get(
+                "MACOSWORLD_SKILLS_LIBRARY_DIR",
+                "mm_skills_download/mac_4_18_skills",
+            ),
+        )
     if "gpt" in gui_agent_name and "/omniparser" in gui_agent_name:
         from agent.openai_omniparser import OpenAI_OmniParser_Agent, GPT_OMNIPARSER_SYSTEM_PROMPT
         return OpenAI_OmniParser_Agent(

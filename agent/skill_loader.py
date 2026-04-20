@@ -1,9 +1,10 @@
 import base64
+import json
 import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 logger = logging.getLogger("macosworld.skill_loader")
@@ -25,6 +26,44 @@ class SkillContent:
     directory: str = ""
 
 
+@dataclass(frozen=True)
+class SkillStateView:
+    view_type: str
+    image_path: str
+    use_for: str = ""
+    label: str = ""
+
+
+@dataclass(frozen=True)
+class SkillStateCard:
+    state_id: str
+    state_name: str
+    stage: str
+    image_role: str
+    when_to_use: str
+    when_not_to_use: str
+    visible_cues: List[str]
+    verification_cue: str
+    visual_evidence_chain: Dict[str, Any]
+    visual_risk: str
+    preferred_view_order: List[str]
+    available_views: List[SkillStateView]
+
+
+@dataclass(frozen=True)
+class LoadedSkillStateView:
+    view: SkillStateView
+    image: Tuple[str, str, str]
+
+
+@dataclass
+class SkillStateSelection:
+    state: SkillStateCard
+    requested_view_types: List[str]
+    reason: str
+    loaded_views: List[LoadedSkillStateView] = field(default_factory=list)
+
+
 class SkillLoader:
     def __init__(self, skills_library_dir: str = "skills_library", max_skill_chars: int = 12000):
         self._skills_dir = Path(skills_library_dir).expanduser()
@@ -35,6 +74,7 @@ class SkillLoader:
         self._max_skill_chars = max_skill_chars
         self._metadata_cache: Dict[str, SkillMetadata] = {}
         self._content_cache: Dict[str, SkillContent] = {}
+        self._state_cards_cache: Dict[Tuple[str, bool], Optional[List[SkillStateCard]]] = {}
         self._skill_id_to_dir: Dict[str, Path] = {}
         self._basename_to_skill_ids: Dict[str, List[str]] = {}
         self._skill_index_built = False
@@ -70,6 +110,9 @@ class SkillLoader:
             return None
         images = self.load_skill_images(skill_name)
         return {"content": content, "images": images}
+
+    def load_skill_content(self, skill_name: str) -> Optional[SkillContent]:
+        return self._load_skill_content(skill_name)
 
     def load_skill_images(self, skill_name: str) -> List[Tuple[str, str, str]]:
         resolved = self._resolve_skill_identifier_and_dir(skill_name)
@@ -114,28 +157,179 @@ class SkillLoader:
         except Exception:
             return None
 
-    def summarize_runtime_state_cards(self, skill_name: str, max_states: int = 3) -> str:
-        payload = self.load_runtime_state_cards(skill_name)
-        if not isinstance(payload, dict):
-            return "(no runtime state summary)"
-        states = payload.get("states")
-        if not isinstance(states, list) or not states:
-            return "(no runtime state summary)"
+    def load_state_cards(self, skill_name: str, runtime: bool = True) -> Optional[List[SkillStateCard]]:
+        cache_key = (skill_name, runtime)
+        if cache_key in self._state_cards_cache:
+            return self._state_cards_cache[cache_key]
 
-        lines: List[str] = []
-        for state in states[:max_states]:
+        resolved = self._resolve_skill_identifier_and_dir(skill_name)
+        if resolved is None:
+            self._state_cards_cache[cache_key] = None
+            return None
+        _, skill_dir = resolved
+
+        filename = "runtime_state_cards.json" if runtime else "state_cards.json"
+        state_cards_path = skill_dir / filename
+        if not state_cards_path.exists():
+            self._state_cards_cache[cache_key] = None
+            return None
+
+        try:
+            payload = json.loads(state_cards_path.read_text(encoding="utf-8"))
+        except Exception:
+            self._state_cards_cache[cache_key] = None
+            return None
+
+        states = payload.get("states")
+        if not isinstance(states, list):
+            self._state_cards_cache[cache_key] = None
+            return None
+
+        parsed_cards: List[SkillStateCard] = []
+        for state in states:
             if not isinstance(state, dict):
                 continue
-            state_name = state.get("state_name") or state.get("state_id") or "unknown_state"
-            when_to_use = state.get("when_to_use") or state.get("trigger_condition") or ""
-            available_views = state.get("available_views") or []
-            view_types = []
-            for item in available_views:
-                if isinstance(item, dict) and item.get("view_type"):
-                    view_types.append(str(item["view_type"]))
+            available_views: List[SkillStateView] = []
+            for view in state.get("available_views", []) or []:
+                if not isinstance(view, dict):
+                    continue
+                view_type = str(view.get("view_type", "") or "").strip()
+                image_path = str(view.get("image_path", "") or "").strip()
+                if not view_type or not image_path:
+                    continue
+                available_views.append(
+                    SkillStateView(
+                        view_type=view_type,
+                        image_path=image_path,
+                        use_for=str(view.get("use_for", "") or "").strip(),
+                        label=str(view.get("label", "") or "").strip(),
+                    )
+                )
+            parsed_cards.append(
+                SkillStateCard(
+                    state_id=str(state.get("state_id", "") or "").strip(),
+                    state_name=str(state.get("state_name", "") or "").strip(),
+                    stage=str(state.get("stage", "") or "").strip(),
+                    image_role=str(state.get("image_role", "") or "").strip(),
+                    when_to_use=str(state.get("when_to_use", "") or "").strip(),
+                    when_not_to_use=str(state.get("when_not_to_use", "") or "").strip(),
+                    visible_cues=[str(item).strip() for item in (state.get("visible_cues") or []) if str(item).strip()],
+                    verification_cue=str(state.get("verification_cue", "") or "").strip(),
+                    visual_evidence_chain=state.get("visual_evidence_chain") or {},
+                    visual_risk=str(state.get("visual_risk", "") or "").strip(),
+                    preferred_view_order=[
+                        str(item).strip() for item in (state.get("preferred_view_order") or []) if str(item).strip()
+                    ],
+                    available_views=available_views,
+                )
+            )
+
+        self._state_cards_cache[cache_key] = parsed_cards
+        return parsed_cards
+
+    def summarize_runtime_state_cards(self, skill_name: str, max_states: int = 3) -> str:
+        state_cards = self.load_state_cards(skill_name, runtime=True)
+        return self.summarize_state_cards_for_preview(state_cards, max_cards=max_states)
+
+    def summarize_state_cards_for_preview(
+        self,
+        state_cards: Optional[List[SkillStateCard]],
+        max_cards: int = 3,
+    ) -> str:
+        if not state_cards:
+            return "(no runtime state summary)"
+        lines: List[str] = []
+        for card in state_cards[:max_cards]:
+            state_name = card.state_name or card.state_id or "unknown_state"
+            view_types = [view.view_type for view in card.available_views if view.view_type]
             view_suffix = f" [views: {', '.join(view_types)}]" if view_types else ""
-            lines.append(f"- {state_name}{view_suffix}: {str(when_to_use).strip()}")
+            when_to_use = card.when_to_use or "(no when_to_use provided)"
+            lines.append(f"- {state_name}{view_suffix}: {when_to_use}")
         return "\n".join(lines) if lines else "(no runtime state summary)"
+
+    def format_state_cards_for_branch(self, state_cards: Optional[List[SkillStateCard]]) -> str:
+        if not state_cards:
+            return "(no runtime state-card reference)"
+
+        sections: List[str] = ["Runtime state-card reference manifest:"]
+        for card in state_cards:
+            view_lines = []
+            for view in card.available_views:
+                view_lines.append(
+                    f"  - {view.view_type}: path={view.image_path}, use_for={view.use_for or '(missing)'}, label={view.label or '(missing)'}"
+                )
+            visible_cues = ", ".join(card.visible_cues[:4]) if card.visible_cues else "(none listed)"
+            preferred_order = ", ".join(card.preferred_view_order) if card.preferred_view_order else "(none listed)"
+            sections.append(
+                "\n".join(
+                    [
+                        f"[State - {card.state_id}]",
+                        f"state_name: {card.state_name or '(missing)'}",
+                        f"stage: {card.stage or '(missing)'}",
+                        f"when_to_use: {card.when_to_use or '(missing)'}",
+                        f"when_not_to_use: {card.when_not_to_use or '(missing)'}",
+                        f"verification_cue: {card.verification_cue or '(missing)'}",
+                        f"visible_cues: {visible_cues}",
+                        f"visual_risk: {card.visual_risk or '(missing)'}",
+                        f"preferred_view_order: {preferred_order}",
+                        "available_views:",
+                        *(view_lines or ["  - (none listed)"]),
+                    ]
+                )
+            )
+        return "\n\n".join(sections)
+
+    def load_selected_state_views(
+        self,
+        skill_name: str,
+        requests: List[Dict[str, object]],
+        runtime: bool = True,
+    ) -> Tuple[List[SkillStateSelection], List[str]]:
+        state_cards = self.load_state_cards(skill_name, runtime=runtime)
+        resolved = self._resolve_skill_identifier_and_dir(skill_name)
+        if not state_cards or resolved is None:
+            return [], [str(item.get("state_id", "") or "").strip() for item in requests if isinstance(item, dict)]
+
+        _, skill_dir = resolved
+        state_by_id = {card.state_id: card for card in state_cards if card.state_id}
+        selections: List[SkillStateSelection] = []
+        missing_items: List[str] = []
+
+        for item in requests:
+            if not isinstance(item, dict):
+                continue
+            state_id = str(item.get("state_id", "") or "").strip()
+            requested_views = [str(view).strip() for view in (item.get("views") or []) if str(view).strip()]
+            reason = str(item.get("reason", "") or "").strip()
+            state = state_by_id.get(state_id)
+            if state is None:
+                missing_items.append(state_id or "(missing state_id)")
+                continue
+
+            loaded_views: List[LoadedSkillStateView] = []
+            available_view_map = {view.view_type: view for view in state.available_views if view.view_type}
+            for view_type in requested_views:
+                view = available_view_map.get(view_type)
+                if view is None:
+                    missing_items.append(f"{state_id}/{view_type}")
+                    continue
+                image_tuple = self._load_state_view_image(skill_dir, view.image_path)
+                if image_tuple is None:
+                    missing_items.append(f"{state_id}/{view_type}")
+                    continue
+                loaded_views.append(LoadedSkillStateView(view=view, image=image_tuple))
+
+            if loaded_views:
+                selections.append(
+                    SkillStateSelection(
+                        state=state,
+                        requested_view_types=requested_views,
+                        reason=reason,
+                        loaded_views=loaded_views,
+                    )
+                )
+
+        return selections, missing_items
 
     def _load_skill_content(self, skill_name: str) -> Optional[SkillContent]:
         if skill_name in self._content_cache:
@@ -254,3 +448,24 @@ class SkillLoader:
         if suffix == ".bmp":
             return "image/bmp"
         return "application/octet-stream"
+
+    def _load_state_view_image(self, skill_dir: Path, image_path: str) -> Optional[Tuple[str, str, str]]:
+        path = skill_dir / image_path
+        if not path.exists():
+            normalized = image_path.replace("\\", "/")
+            if normalized.lower().startswith("images/"):
+                suffix = normalized.split("/", 1)[1]
+                for images_dir_name in ("Images", "images"):
+                    candidate = skill_dir / images_dir_name / suffix
+                    if candidate.exists():
+                        path = candidate
+                        break
+        if not path.exists():
+            return None
+
+        img_bytes = path.read_bytes()
+        return (
+            path.name,
+            base64.b64encode(img_bytes).decode("utf-8"),
+            self._get_mime_type(path.suffix),
+        )
