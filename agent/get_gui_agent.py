@@ -45,6 +45,34 @@ def get_gui_agent(gui_agent_name, remote_client):
                 "mm_skills_download/mac_4_18_skills",
             ),
         )
+    if (
+        gui_agent_name in {"openai-skill-v2-mm-branch", "openai-skill-mm-branch-v2"}
+        or gui_agent_name.endswith("/skill-v2-mm-branch")
+        or gui_agent_name.endswith("/skill-mm-branch-v2")
+    ):
+        from agent.openai_skill_v2 import OpenAISkillAgentV2
+
+        if gui_agent_name.endswith("/skill-v2-mm-branch"):
+            model_name = gui_agent_name.rsplit("/", 1)[0]
+        elif gui_agent_name.endswith("/skill-mm-branch-v2"):
+            model_name = gui_agent_name.rsplit("/", 1)[0]
+        else:
+            model_name = (
+                os.environ.get("MACOSWORLD_OPENAI_SKILL_V2_MODEL")
+                or os.environ.get("MACOSWORLD_OPENAI_SKILL_MODEL")
+                or "gpt-4o"
+            ).strip() or "gpt-4o"
+        return OpenAISkillAgentV2(
+            model=model_name,
+            remote_client=remote_client,
+            screenshot_rolling_window=image_window,
+            top_p=0.9,
+            temperature=1.0,
+            skills_library_dir=os.environ.get(
+                "MACOSWORLD_SKILLS_LIBRARY_DIR",
+                "mm_skills_download/mac_4_18_skills",
+            ),
+        )
     if gui_agent_name == "openai-skill-mm-branch" or gui_agent_name.endswith("/skill-mm-branch"):
         from agent.openai_skill import OpenAISkillAgent
 
